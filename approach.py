@@ -8,13 +8,12 @@ LEFT = 2
 RIGHT = 3
 naction = 4
 
-def reward(s,a):
-    if a == RIGHT:
-        return s 
-    elif a == LEFT:
-        return -50 
-    else:
-        return -100
+def reward(s,a,length):
+    if a == RIGHT and s + 1 == length-1:
+        return 100 
+    elif a != RIGHT:
+        return -10 
+    return 0
 
 def updateState(x,y,a):
     if a == RIGHT:
@@ -26,6 +25,12 @@ def updateState(x,y,a):
     else:
         y = y + 1
     return x,y 
+
+def select(q):
+    qmax = np.max(q)
+    qmin = min(0,np.min(q))
+    equivalent_actions = np.where((qmax - q) < 0.05 * (qmax - qmin))[0]
+    return equivalent_actions[np.random.randint(0,equivalent_actions.size)]
 
 def randomSelect(pSum):
     r = np.random.rand()
@@ -47,26 +52,34 @@ def train(length,width,gamma=0.9,epsilon=0.9,alpha=0.1,max_iter=1000):
     # parameters
     nstate = length
     Q = np.random.rand(nstate,naction)
+    Q[-1,:] = 0.
     R = np.zeros((nstate,naction))
+    C = np.zeros((nstate,naction))
 
     for s in np.arange(nstate):
         for a in np.arange(naction):
-            R[s,a] = reward(s,a)
+            R[s,a] = reward(s,a,length)
 
-    for i in np.arange(1000):
+    epsilon = 0
+    for i in np.arange(10000):
         x = 0
         y = np.random.randint(0,width)
         s = x
+        if epsilon < 0.95 and i%100==0:
+            epsilon = epsilon + 0.01
 
         for it in np.arange(max_iter):
-            a = np.argmax(Q[s,:])
             if np.random.rand() > epsilon:
                 a = np.random.randint(0,naction)
+            else:
+                a = select(Q[s,:])
+            C[s,a] = C[s,a] + 1
             # take action a, observe s_{t+1}
             x,y = updateState(x,y,a)
             x = max(0,min(x,length-1))
             y = max(0,min(y,width-1))
             snext = x
+            alpha = 1/C[s,a]
             Q[s,a] = Q[s,a] + alpha * (R[s,a] + gamma * np.max(Q[snext,:]) \
                     - Q[s,a])
             s = snext
@@ -114,5 +127,5 @@ def main():
     print episode[1::2]
     print Q
 
-# main()
+#main()
 
